@@ -79,10 +79,14 @@ def get_blob_content(blob_name):
     file_content = blob_data.readall()
     return file_content
 
-def extract_json_from_string(json_string: str):
+def extract_json_from_string(json_string: str, file_name: str = "filename"):
     data_json_string = json_string[json_string.find("{"):json_string.rfind("}")+1]
     data_json = json.loads(data_json_string)
-    return data_json
+    
+    updated_json = {"filename": file_name}
+    updated_json.update(data_json)
+    
+    return updated_json
 
 if "data_model" not in st.session_state:
     st.session_state["data_model"] = None
@@ -140,15 +144,18 @@ if st.session_state["data_model"]:
     st.write("If you are satisfied with this output, then press 'Accept', otherwise, adjust the prompt and press 'Generate' again")
     if st.button("Accept"):
         with st.spinner("Creating the analyses..."):
-            amount_files_for_iteration = len(get_blob_subfolder(True))
+            subfolder_file_names = sorted(get_blob_subfolder(True))
+            amount_files_for_iteration = len(subfolder_file_names)
+            print(subfolder_file_names)
             data_sources = []
             for folder in st.session_state["folder_options"]:
                 data_sources.append({"folder_name":folder,"prompt_name":folder})
             progress_bar = st.progress(0,text="Creating the analyses for each candidate...")
             json_results = []
             for i in range(amount_files_for_iteration):
+                file_name = subfolder_file_names[i].split("/")[-1]
                 result = create_analyses(i,st.session_state["data_model"],data_sources)
-                json_results.append(extract_json_from_string(result))
+                json_results.append(extract_json_from_string(result,file_name))
                 progress_bar.progress((100//amount_files_for_iteration)*(i+1))
             df = pd.DataFrame(json_results)
             excel_bytes = io.BytesIO()
@@ -157,6 +164,7 @@ if st.session_state["data_model"]:
             container_client = blob_service_client.get_container_client(os.environ.get("CONTAINER_NAME"))
             container_client.upload_blob(name=f"results/results_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx", data=excel_bytes.getvalue(), overwrite=True)
         st.success("The results have been compiled. Please look in the 'results' folder of the blob storage.")
+        st.download_button("Download the Excel file",data=excel_bytes.getvalue(),file_name=f"results_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx", mime="application/octet-stream")
         
     
     
