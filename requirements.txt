@@ -1,0 +1,7 @@
+openai==0.28.1
+azure-storage-blob
+pandas
+openpyxl
+streamlit
+python-docx
+python-dotenv
