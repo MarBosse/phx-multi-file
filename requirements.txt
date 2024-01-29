@@ -5,3 +5,4 @@ openpyxl
 streamlit
 python-docx
 python-dotenv
+PyMuPDF

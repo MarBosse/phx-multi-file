@@ -8,6 +8,7 @@ import pandas as pd
 from azure.storage.blob import BlobServiceClient, ContainerClient
 from dotenv import load_dotenv
 from docx import Document
+import fitz 
 
 load_dotenv()
 
@@ -16,21 +17,35 @@ openai.api_base = os.environ.get("OPEN_API_BASE")
 openai.api_type = os.environ.get("OPEN_API_TYPE")
 openai.api_version = os.environ.get("OPEN_API_VERSION")
 
-def extract_text_from_word(blob_content):
-    bytes_io = io.BytesIO(blob_content)
-    doc = Document(bytes_io)
+def extract_text_from_blob(blob_content, file_type):
     text = ""
 
-    for paragraph in doc.paragraphs:
-        text += paragraph.text + "\n"
+    if file_type == 'docx':
+        bytes_io = io.BytesIO(blob_content)
+        doc = Document(bytes_io)
+
+        for paragraph in doc.paragraphs:
+            text += paragraph.text + "\n"
+
+    elif file_type == 'pdf':
+        pdf_document = fitz.open(stream=blob_content, filetype="pdf")
+        
+        for page_number in range(pdf_document.page_count):
+            page = pdf_document[page_number]
+            text += page.get_text()
 
     return text
 
 def create_analyses(i: int,json_model, data_sources):
+    blob_service_client = BlobServiceClient.from_connection_string(os.environ.get("BLOB_STORAGE_CONNECTION_STRING"))
+    container_client = blob_service_client.get_container_client(os.environ.get("CONTAINER_NAME"))
     system_prompt = "You receive a question from a user asking for data from a document or multiple documents. Please extract the exact data from the user question out of the document(s). Return your answers in the form of this example JSON Objekt: "+json_model+". Do not use the values provided by the example data model and provide precise values to the given keys. Datasource(s) to extract from: "
     for source in data_sources:
-        blob_data = get_blob_content(f'{os.environ.get("USE_CASE_FOLDER")}/{source["folder_name"]}/{i+1}.docx')
-        file_text = extract_text_from_word(blob_data)
+        files_in_folder = list(container_client.list_blob_names(name_starts_with=f'{os.environ.get("USE_CASE_FOLDER")}/{source["folder_name"]}'))
+        file_name = files_in_folder[i]
+        file_ending = file_name.split(".")[-1]
+        blob_data = get_blob_content(f'{files_in_folder[i]}')
+        file_text = extract_text_from_blob(blob_data, file_ending)
         system_prompt += f"{source['prompt_name']}: {file_text}, "
     try:
         res = openai.ChatCompletion.create(
@@ -153,6 +168,7 @@ if st.session_state["data_model"]:
             progress_bar = st.progress(0,text="Creating the analyses for each candidate...")
             json_results = []
             for i in range(amount_files_for_iteration):
+                file_path_string = subfolder_file_names[i]
                 file_name = subfolder_file_names[i].split("/")[-1]
                 result = create_analyses(i,st.session_state["data_model"],data_sources)
                 json_results.append(extract_json_from_string(result,file_name))
