@@ -35,7 +35,7 @@ def create_analyses(i: int,json_model, data_sources):
     try:
         res = openai.ChatCompletion.create(
                     # engine="gpt-35-turbo",
-                    deployment_id="aaai-gpt",
+                    deployment_id=os.environ.get("OPEN_API_DEPLYOMENT"),
                     temperature=0.1,
                     messages=[
                         {
@@ -111,7 +111,7 @@ if len(st.session_state["folder_options"])>0:
                 try:
                     res = openai.ChatCompletion.create(
                         # engine="gpt-35-turbo",
-                        deployment_id="aaai-gpt",
+                        deployment_id=os.environ.get("OPEN_API_DEPLYOMENT"),
                         temperature=0.1,
                         messages=[
                             {
