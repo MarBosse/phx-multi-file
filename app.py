@@ -58,6 +58,10 @@ def create_analyses(i: int,json_model, data_sources):
                             "content": system_prompt,
                         },
                         {
+                            "role": "system",
+                            "content": "It is essential to display the data in the specified JSON format. If no value can be specified for a special key, then enter 'Not found' as the value."
+                        },
+                        {
                             "role": "user",
                             "content": st.session_state["prompt"],
                         },
@@ -171,7 +175,21 @@ if st.session_state["data_model"]:
                 file_path_string = subfolder_file_names[i]
                 file_name = subfolder_file_names[i].split("/")[-1]
                 result = create_analyses(i,st.session_state["data_model"],data_sources)
-                json_results.append(extract_json_from_string(result,file_name))
+                print(result)
+                print(file_name)
+                try:
+                    json_excel_row = extract_json_from_string(result,file_name)
+                except:
+                    result_second_time = create_analyses(i,st.session_state["data_model"],data_sources)
+                    try:
+                        json_excel_row = extract_json_from_string(result,file_name)
+                    except:
+                        json_excel_row = {"filename": file_name}
+                        data_model_json_null_values = data_model_json.copy()
+                        for key in data_model_json_null_values:
+                            data_model_json_null_values[key] = "Not found"
+                        json_excel_row.update(data_model_json_null_values)
+                json_results.append(json_excel_row)
                 progress_bar.progress((100//amount_files_for_iteration)*(i+1))
             df = pd.DataFrame(json_results)
             excel_bytes = io.BytesIO()
