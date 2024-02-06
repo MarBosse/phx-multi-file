@@ -41,7 +41,7 @@ def create_analyses(i: int,json_model, data_sources):
     container_client = blob_service_client.get_container_client(os.environ.get("CONTAINER_NAME"))
     system_prompt = "You receive a question from a user asking for data from a document or multiple documents. Please extract the exact data from the user question out of the document(s). Return your answers in the form of this example JSON Objekt: "+json_model+". Do not use the values provided by the example data model and provide precise values to the given keys. Datasource(s) to extract from: "
     for source in data_sources:
-        files_in_folder = list(container_client.list_blob_names(name_starts_with=f'{os.environ.get("USE_CASE_FOLDER")}/{source["folder_name"]}'))
+        files_in_folder = sorted(list(container_client.list_blob_names(name_starts_with=f'{os.environ.get("USE_CASE_FOLDER")}/{source["folder_name"]}')))
         file_name = files_in_folder[i]
         file_ending = file_name.split(".")[-1]
         blob_data = get_blob_content(f'{files_in_folder[i]}')
@@ -71,7 +71,7 @@ def create_analyses(i: int,json_model, data_sources):
         print(f"Fehler beim erstellen der analyse von CV {i}: {str(e)}")
         st.error("Something went wrong, please contact the site admin.", icon="🚨")
         return ""
-    print(f"Results from CV nr {i+1}: \n"+res["choices"][0]["message"]["content"]+"\n")
+    # print(f"Results from CV nr {i+1}: \n"+res["choices"][0]["message"]["content"]+"\n")
     return res["choices"][0]["message"]["content"]+"\n\n"
 
 def get_blob_subfolder(amount_subfolder: bool):
@@ -90,6 +90,17 @@ def get_blob_subfolder(amount_subfolder: bool):
             if len(blob_path_parts) > 2:
                 subfolders.add(blob_path_parts[1])
     return list(subfolders)
+
+def get_nth_blob_subfolder(n: int):
+    blob_service_client = BlobServiceClient.from_connection_string(os.environ.get("BLOB_STORAGE_CONNECTION_STRING"))
+    container_client = blob_service_client.get_container_client(os.environ.get("CONTAINER_NAME"))
+    subfolder = set()
+    print(container_client.list_blob_names(name_starts_with=os.environ.get("USE_CASE_FOLDER")+"/"+st.session_state["multiselect_choices"][n]))
+    for blob_name in container_client.list_blob_names(name_starts_with=os.environ.get("USE_CASE_FOLDER")+"/"+st.session_state["multiselect_choices"][n]):
+        blob_path_parts = blob_name.split('/')
+        if len(blob_path_parts) > 2:
+            subfolder.add(blob_name)
+    return list(subfolder)
 
 def get_blob_content(blob_name):
     blob_service_client = BlobServiceClient.from_connection_string(os.environ.get("BLOB_STORAGE_CONNECTION_STRING"))
@@ -143,7 +154,7 @@ if len(st.session_state["folder_options"])>0:
                             },
                         ],
                     )
-                    print(res["choices"][0]["message"]["content"])
+                    # print(res["choices"][0]["message"]["content"])
                     st.session_state["data_model"] = res["choices"][0]["message"]["content"]
                     st.rerun()
                 except Exception as e: 
@@ -165,7 +176,6 @@ if st.session_state["data_model"]:
         with st.spinner("Creating the analyses..."):
             subfolder_file_names = sorted(get_blob_subfolder(True))
             amount_files_for_iteration = len(subfolder_file_names)
-            print(subfolder_file_names)
             data_sources = []
             for folder in st.session_state["folder_options"]:
                 data_sources.append({"folder_name":folder,"prompt_name":folder})
@@ -175,8 +185,6 @@ if st.session_state["data_model"]:
                 file_path_string = subfolder_file_names[i]
                 file_name = subfolder_file_names[i].split("/")[-1]
                 result = create_analyses(i,st.session_state["data_model"],data_sources)
-                print(result)
-                print(file_name)
                 try:
                     json_excel_row = extract_json_from_string(result,file_name)
                 except:
