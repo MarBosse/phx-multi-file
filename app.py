@@ -195,7 +195,10 @@ if st.session_state["data_model"]:
                         json_excel_row = {"filename": file_name}
                         data_model_json_null_values = data_model_json.copy()
                         for key in data_model_json_null_values:
-                            data_model_json_null_values[key] = "Not found"
+                            if key == "filename":
+                                data_model_json_null_values[key] = file_name
+                            else:
+                                data_model_json_null_values[key] = "Not found"
                         json_excel_row.update(data_model_json_null_values)
                 json_results.append(json_excel_row)
                 progress_bar.progress((100//amount_files_for_iteration)*(i+1))
