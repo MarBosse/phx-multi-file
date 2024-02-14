@@ -6,3 +6,5 @@ streamlit
 python-docx
 python-dotenv
 PyMuPDF
+azure-identity
+azure-search-documents>=11.4.0
