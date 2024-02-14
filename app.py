@@ -207,9 +207,16 @@ if st.session_state["data_model"]:
         with st.spinner("Creating the analyses..."):
             progress_bar = st.progress(0,text="Creating the analyses for each document...")
             json_results = []
+            files_for_iteration = 0
+            for option in st.session_state["folder_options"]:
+                files_for_iteration += len(get_specific_blob_subfolder(option))
+            print(f"files_for_iteration: {files_for_iteration}")
+            k = 0 
             for i, subfolder_coice in enumerate(st.session_state["folder_options"]):
                 subfolder_file_names = get_specific_blob_subfolder(subfolder_coice)
-                for i, file_path_string in enumerate(subfolder_file_names):
+                for j, file_path_string in enumerate(subfolder_file_names):
+                    k += 1
+                    print(k)
                     file_name = file_path_string.split("/")[-1]
                     result = create_analyses(file_path_string,st.session_state["data_model"])
                     try:
@@ -234,7 +241,7 @@ if st.session_state["data_model"]:
                                         data_model_json_null_values[key] = "Not found"
                             json_excel_row.update(data_model_json_null_values)
                     json_results.append(json_excel_row)
-                # progress_bar.progress((100//amount_files_for_iteration)*(i+1))
+                    progress_bar.progress((100//files_for_iteration)*(k))
             df = pd.DataFrame(json_results)
             excel_bytes = io.BytesIO()
             df.to_excel(excel_bytes, index=False)
