@@ -66,7 +66,7 @@ def create_analyses(file_path: str,json_model):
                     ],
                 )
     except Exception as e: 
-        if str(e).startswith("This model's maximum context length is 32768 tokens."):
+        if str(e).startswith("This model's maximum context length"):
             return "TOO_LONG"
         else:
             print(f"Fehler beim erstellen der analyse von CV {i}: {str(e)}")
