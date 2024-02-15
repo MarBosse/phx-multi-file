@@ -15,11 +15,6 @@ import fitz
 
 load_dotenv()
 
-openai.api_key = os.environ.get("OPENAI_API_KEY")
-openai.api_base = os.environ.get("OPENAI_API_BASE")
-openai.api_type = os.environ.get("OPENAI_API_TYPE")
-openai.api_version = os.environ.get("OPENAI_API_VERSION")
-
 def extract_text_from_blob(blob_content, file_type):
     text = ""
 
@@ -46,9 +41,13 @@ def create_analyses(file_path: str,json_model):
     file_text = extract_text_from_blob(blob_data, file_ending)
     system_prompt += file_text
     try:
+        openai.api_key = os.environ.get("OPENAI_API_KEY"+("4"if st.session_state["gpt_toggle"] else ""))
+        openai.api_base = os.environ.get("OPENAI_API_BASE"+("4"if st.session_state["gpt_toggle"] else ""))
+        openai.api_type = os.environ.get("OPENAI_API_TYPE"+("4"if st.session_state["gpt_toggle"] else ""))
+        openai.api_version = os.environ.get("OPENAI_API_VERSION"+("4"if st.session_state["gpt_toggle"] else ""))
         res = openai.ChatCompletion.create(
                     # engine="gpt-35-turbo",
-                    deployment_id=os.environ.get("OPENAI_API_DEPLYOMENT"),
+                    deployment_id=os.environ.get("OPENAI_API_DEPLYOMENT"+("4"if st.session_state["gpt_toggle"] else "")),
                     temperature=0.1,
                     messages=[
                         {
@@ -68,6 +67,8 @@ def create_analyses(file_path: str,json_model):
     except Exception as e: 
         if str(e).startswith("This model's maximum context length"):
             return "TOO_LONG"
+        elif str(e).startswith("Requests to the ChatCompletions_Create Operation under Azure OpenAI"):
+            return "Rate limit exceeded"
         else:
             print(f"Fehler beim erstellen der analyse von CV {i}: {str(e)}")
             st.error("Something went wrong, please contact the site admin.", icon="🚨")
@@ -139,6 +140,7 @@ if "data_model" not in st.session_state:
     st.session_state["data_model"] = None
 if "multiselect_choices" not in st.session_state:
     st.session_state["multiselect_choices"] = get_blob_subfolder(False)
+
 # if "db" not in st.session_state:
     # #TODO: Add the search client
     # VectorizedQuery(
@@ -160,6 +162,7 @@ col2.image("phx_logo.svg")
 
 # st.write("Please select the documents to be used as data sources.")
 
+st.toggle("Activate to use GPT-4, otherwise GPT-35-turbo will be used", key="gpt_toggle")
 st.multiselect("Please select the document folders to be used as data sources.",st.session_state["multiselect_choices"], key="folder_options")
 
 if len(st.session_state["folder_options"])>0:
@@ -169,9 +172,13 @@ if len(st.session_state["folder_options"])>0:
         if len(st.session_state["prompt"])>0:
             with st.spinner("Generating the data model..."):
                 try:
+                    openai.api_key = os.environ.get("OPENAI_API_KEY"+("4"if st.session_state["gpt_toggle"] else ""))
+                    openai.api_base = os.environ.get("OPENAI_API_BASE"+("4"if st.session_state["gpt_toggle"] else ""))
+                    openai.api_type = os.environ.get("OPENAI_API_TYPE"+("4"if st.session_state["gpt_toggle"] else ""))
+                    openai.api_version = os.environ.get("OPENAI_API_VERSION"+("4"if st.session_state["gpt_toggle"] else ""))
                     res = openai.ChatCompletion.create(
                         # engine="gpt-35-turbo",
-                        deployment_id=os.environ.get("OPENAI_API_DEPLYOMENT"),
+                        deployment_id=os.environ.get("OPENAI_API_DEPLYOMENT"+("4"if st.session_state["gpt_toggle"] else "")),
                         temperature=0.1,
                         messages=[
                             {
