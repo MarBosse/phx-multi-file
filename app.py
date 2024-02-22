@@ -157,8 +157,9 @@ if "multiselect_choices" not in st.session_state:
     # st.session_state["db"] = search_client
 col1, col2 = st.columns([2, 1])
 
-col1.title("Document analyzer")
+col1.title("DEMO")
 col2.image("phx_logo.svg")
+st.title("Document analyzer")
 
 # st.write("Please select the documents to be used as data sources.")
 
