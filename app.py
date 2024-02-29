@@ -34,12 +34,19 @@ def extract_text_from_blob(blob_content, file_type):
 
     return text
 
-def create_analyses(file_path: str,json_model):
+def create_analyses(file_path: str,json_model, use_RAG: bool, prompt: str):
     system_prompt = "You receive a question from a user asking for data from a document. Please extract the exact data from the user question out of the document. Return your answers in the form of this example JSON Objekt: "+json_model+". Do not use the values provided by the example data model and provide precise values to the given keys. Document to extract from: "
     file_ending = file_path.split(".")[-1]
-    blob_data = get_blob_content(file_path)
-    file_text = extract_text_from_blob(blob_data, file_ending)
+    if use_RAG:
+        file_title = file_path.split("/")[-1]
+        file_chunks = get_relevant_chunks(prompt, file_title)
+        file_text = " ".join(file_chunks)
+        print(len(file_chunks))
+    else:
+        blob_data = get_blob_content(file_path)
+        file_text = extract_text_from_blob(blob_data, file_ending)
     system_prompt += file_text
+    
     try:
         openai.api_key = os.environ.get("OPENAI_API_KEY"+("4"if st.session_state["gpt_toggle"] else ""))
         openai.api_base = os.environ.get("OPENAI_API_BASE"+("4"if st.session_state["gpt_toggle"] else ""))
@@ -130,33 +137,28 @@ def extract_json_from_string(json_string: str, file_name: str = "filename"):
     
     return updated_json
 
-def get_relevant_chunks(prompt: str):
-    #raw_candidates = st.session_state["db"].semantic_hybrid_search_with_score_and_rerank(query_string, k=50, filters=filter_string)
-    relevant_chunks  = st.session_state["db"].semantic_hybrid_search_with_score_and_rerank(prompt, k=5)
-    print(relevant_chunks)
-    return relevant_chunks
+def get_relevant_chunks(prompt: str, file_name_filter: str):
+    search_client: SearchClient = st.session_state["db"]
+    search_results = search_client.search(search_text=prompt, query_type=QueryType.SEMANTIC, top=os.environ["AZURE_SEARCH_TOP_K"], filter="title eq '"+file_name_filter+"'")
+    chunks = [result["chunk"] for result in search_results]
+    return chunks
+
 
 if "data_model" not in st.session_state:
     st.session_state["data_model"] = None
 if "multiselect_choices" not in st.session_state:
     st.session_state["multiselect_choices"] = get_blob_subfolder(False)
+if "db" not in st.session_state:
+    search_client = SearchClient(
+            endpoint=os.environ["AZURE_SEARCH_ENDPOINT"],
+            index_name="mf-phx-docs",
+            credential=AzureKeyCredential(os.environ["AZURE_SEARCH_KEY"]),
+    )
 
-# if "db" not in st.session_state:
-    # #TODO: Add the search client
-    # VectorizedQuery(
-    #                 vector="",
-    #                 k_nearest_neighbors=3,
-    #                 fields="embedding",
-    # )
-    # search_client = SearchClient(
-    #         endpoint=os.environ["AZURE_SEARCH_ENDPOINT"],
-    #         index_name="mf-phx-docs",
-    #         credential=AzureKeyCredential(os.environ["AZURE_SEARCH_KEY"]),
-    # )
-    # print("Creating the search client...")
-    # st.session_state["db"] = search_client
+    st.session_state["db"] = search_client
+
+
 col1, col2 = st.columns([2, 1])
-
 col1.title("DEMO")
 col2.image("phx_logo.svg")
 st.title("Document analyzer")
@@ -164,8 +166,9 @@ st.title("Document analyzer")
 # st.write("Please select the documents to be used as data sources.")
 
 st.toggle("Activate to use GPT-4, otherwise GPT-35-turbo will be used", key="gpt_toggle")
+st.toggle("Activate to use Azure AI Search as a RAG system", key="rag_toggle")
 st.multiselect("Please select the document folders to be used as data sources.",st.session_state["multiselect_choices"], key="folder_options")
-
+#print(get_relevant_chunks("Can i send gifts to pharmacists","Code of Conduct PHOENIX group.pdf"))
 if len(st.session_state["folder_options"])>0:
     st.text_input("Enter the prompt regarding the data to be extracted from the documents",placeholder="E.g.: give me the names and dates of birth of the candidate",key="prompt")
     st.write("If you are satisfied with the prompt, click on 'Generate' to create the data model.")
@@ -226,12 +229,12 @@ if st.session_state["data_model"]:
                     k += 1
                     print(k)
                     file_name = file_path_string.split("/")[-1]
-                    result = create_analyses(file_path_string,st.session_state["data_model"])
+                    result = create_analyses(file_path_string,st.session_state["data_model"],st.session_state["rag_toggle"],st.session_state["prompt"])
                     try:
                         json_excel_row = extract_json_from_string(result,file_name)
                     except Exception as e:
                         # print(f"Fehler beim erstellen der analyse doc {file_path_string}: {str(e)}")
-                        result_second_time = create_analyses(file_path_string,st.session_state["data_model"])
+                        result_second_time = create_analyses(file_path_string,st.session_state["data_model"], st.session_state["rag_toggle"],st.session_state["prompt"])
                         print(f"result_second_time: {result_second_time}")
                         try:
                             json_excel_row = extract_json_from_string(result,file_name)
